@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家族階層圖系統 - 歷史文史完整版</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --hover-color: #45a049;
+            --line-color: #2196F3; /* 原圖經典藍色連線 */
+            --bg-color: #f9f9f9;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 50px;
+        }
+
+        /* 畫布外層 */
+        .tree-wrapper {
+            position: relative;
+            min-width: 1200px; 
+            padding: 40px 20px;
+        }
+
+        /* SVG 背景連線畫布 */
+        #lineSvg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 頂層大容器 */
+        .main-clans-container {
+            position: relative;
+            display: grid;
+            grid-template-columns: auto auto auto;
+            justify-content: flex-start; /* 全部強力靠左 */
+            align-items: flex-start;
+            z-index: 1;
+        }
+
+        /* 垂直世代群組 */
+        .clan-column {
+            display: flex;
+            flex-direction: column;
+            gap: 100px; /* 大幅拉開每一代之間的上下間距 */
+        }
+
+        /* 內部水平並排人名 */
+        .nodes-inline {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        /* 核心垂直綁定結構 */
+        .branch-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 100px;
+        }
+
+        /* 關係標籤 */
+        .relation-label {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            color: #666;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* 人名節點按鈕 */
+        .member-node {
+            display: inline-block;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            padding: 15px 8px;
+            font-size: 1.1rem;
+            letter-spacing: 4px;
+            font-weight: bold;
+            color: #2e7d32;
+            background-color: #fff;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            z-index: 2;
+        }
+
+        .member-node:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        /* 原生 Modal 樣式 */
+        dialog {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            padding: 25px;
+            width: 420px;
+            max-width: 90vw;
+            animation: fadeIn 0.2s ease;
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-header {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 5px;
+        }
+
+        /* 舒服閱讀的備註展示盒 */
+        .modal-body {
+            font-size: 1.05rem;
+            line-height: 1.6;
+            color: #444;
+            min-height: 100px;
+            max-height: 350px;
+            overflow-y: auto;
+            white-space: pre-wrap; /* 保持程式碼中的斷行與空格 */
+            background-color: #fcfcfc;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-close {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            background-color: #e0e0e0;
+            color: #333;
+            transition: background 0.2s;
+        }
+        .btn-close:hover { background-color: #d5d5d5; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>家族關係層級圖</h1>
+
+    <div class="tree-wrapper" id="treeWrapper">
+        <svg id="lineSvg"></svg>
+
+        <div class="main-clans-container">
+            
+            <div class="clan-column" style="flex-shrink: 0;">
+                <div class="nodes-inline" style="justify-content: flex-start; gap: 80px; padding-left: 20px;">
+                    <div class="nodes-inline" id="g-陳天生夫妻">
+                        <button class="member-node" id="n-陳天生" data-name="陳天生">陳天生</button>
+                        <button class="member-node" id="n-藍法" data-name="藍法">藍法</button>
+                    </div>
+                    <div class="nodes-inline" id="g-林糖夫妻">
+                        <button class="member-node" id="n-林糖" data-name="林糖">林糖</button>
+                        <button class="member-node" id="n-李忤" data-name="李忤">李忤</button>
+                    </div>
+                </div>
+
+                <div class="nodes-inline" style="justify-content: flex-start; gap: 115px; padding-left: 55px;">
+                    <button class="member-node" id="n-陳清炎" data-name="陳清炎">陳清炎</button>
+                    <button class="member-node" id="n-林麵" data-name="林麵">林麵</button>
+                </div>
+
+                <div class="nodes-inline" style="justify-content: flex-start; padding-left: 212px;">
+                    <button class="member-node" id="n-陳木" data-name="陳木">陳木</button>
+                </div>
+
+                <div class="nodes-inline" style="gap: 25px; justify-content: flex-start;">
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳東隆" data-name="陳東隆">陳東隆</button>
+                        <div class="nodes-inline"><button class="member-node" id="c-陳東隆-1" data-name="陳薏婷">陳薏婷</button></div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳鳳鶯" data-name="陳鳳鶯">陳鳳鶯</button>
+                        <div class="nodes-inline"><button class="member-node" id="c-陳鳳鶯-1" data-name="蔡佳良">蔡佳良</button></div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳雪梅" data-name="陳雪梅">陳雪梅</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳雪梅-1" data-name="余青桂">余青桂</button>
+                            <button class="member-node" id="c-陳雪梅-2" data-name="余青松">余青松</button>
+                            <button class="member-node" id="c-陳雪梅-3" data-name="余青美">余青美</button>
+                            <button class="member-node" id="c-陳雪梅-4" data-name="余青秀">余青秀</button>
+                        </div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳美麟" data-name="陳美麟">陳美麟</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳美麟-1" data-name="陳孝謙">陳孝謙</button>
+                            <button class="member-node" id="c-陳美麟-2" data-name="陳宇濤">陳宇濤</button>
+                            <button class="member-node" id="c-陳美麟-3" data-name="陳宇峰">陳宇峰</button>
+                            <button class="member-node" id="c-陳美麟-4" data-name="陳宥芯">陳宥芯</button>
+                        </div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳東輝" data-name="陳東輝">陳東輝</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳東輝-1" data-name="陳麗如">陳麗如</button>
+                            <button class="member-node" id="c-陳東輝-2" data-name="陳安妮">陳安妮</button>
+                        </div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳富美" data-name="陳富美">陳富美</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳富美-1" data-name="李捷忻">李捷忻</button>
+                            <button class="member-node" id="c-陳富美-2" data-name="李宜蓁">李宜蓁</button>
+                            <button class="member-node" id="c-陳富美-3" data-name="李梓琳">李梓琳</button>
+                        </div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳美莉" data-name="陳美莉">陳美莉</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳美莉-1" data-name="林俊逸">林俊逸</button>
+                            <button class="member-node" id="c-陳美莉-2" data-name="林俊廷">林俊廷</button>
+                        </div>
+                    </div>
+                    <div class="branch-group">
+                        <button class="member-node" id="n-陳雅莉" data-name="陳雅莉">陳雅莉</button>
+                        <div class="nodes-inline">
+                            <button class="member-node" id="c-陳雅莉-1" data-name="尤思穎">尤思穎</button>
+                            <button class="member-node" id="c-陳雅莉-2" data-name="尤思緯">尤思緯</button>
+                            <button class="member-node" id="c-陳雅莉-3" data-name="尤思瑜">尤思瑜</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="clan-column" style="margin-top: 154px; margin-left: -750px; flex-shrink: 0;">
+                <div class="nodes-inline" id="g-潘家父母">
+                    <span class="relation-label">親生關係</span>
+                    <button class="member-node" id="n-潘金竜" data-name="潘金竜">潘金竜</button>
+                    <button class="member-node" id="n-潘陳阿珠" data-name="潘陳阿珠">潘陳阿珠</button>
+                </div>
+                <div class="nodes-inline" id="g-潘家子女" style="gap: 12px;">
+                    <button class="member-node" id="c-潘-1" data-name="潘守明">潘守明</button>
+                    <button class="member-node" id="c-潘-2" data-name="潘金花">潘金花</button>
+                    <button class="member-node" id="c-潘-3" data-name="潘守寶">潘守寶</button>
+                    <button class="member-node" id="n-陳潘却里" data-name="陳潘却里">陳潘却里</button>
+                    <button class="member-node" id="c-潘-5" data-name="潘守福">潘守福</button>
+                    <button class="member-node" id="c-潘-6" data-name="潘守源">潘守源</button>
+                    <button class="member-node" id="c-潘-7" data-name="月眉阿姨">月眉阿姨</button>
+                </div>
+            </div>
+
+            <div class="clan-column" style="margin-top: 154px; margin-left: 50px; flex-shrink: 0;">
+                <div class="nodes-inline" id="g-廖家父母">
+                    <span class="relation-label">收養關係</span>
+                    <button class="member-node" id="n-廖芳土" data-name="廖芳土">廖芳土</button>
+                    <button class="member-node" id="n-廖謝蘭英" data-name="廖謝蘭英">廖謝蘭英</button>
+                </div>
+                <div class="nodes-inline" id="g-廖家子女" style="gap: 15px;">
+                    <button class="member-node" id="c-廖-1" data-name="陳潘却里(右)">陳潘却里</button>
+                    <button class="member-node" id="c-廖-2" data-name="TOMI">富美TOMI?</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <dialog id="noteModal">
+        <div class="modal-header" id="modalTitle">人員名稱</div>
+        <div class="modal-body" id="modalBodyText"></div>
+        <div class="modal-footer">
+            <button class="btn-close" id="closeModalBtn">關閉</button>
+        </div>
+    </dialog>
+
+    <script>
+        const familyNotes = {
+            '陳天生': '【家族層級】陳清炎的親生父親。',
+            '藍法': '【家族層級】陳清炎的親生母親。',
+            '林糖': '【家族層級】林麵的親生父親。',
+            '李忤': '【家族層級】林麵的親生母親。',
+            
+            '潘金竜': '【配偶關係】\n▪妻為 潘陳阿珠。\n\n【子女後代】為 陳潘却里 之親生父親，\n共育有：\n▪ 長子：潘守明\n▪ 長女：潘金花\n▪ 二子：潘守寶\n▪ 二女：陳潘却里\n▪ 三子：潘守福\n▪ 四子：潘守源\n▪ 三女：月眉阿姨',
+            '潘陳阿珠': '【配偶關係】\n▪夫為 潘金竜。\n\n【家族層級】陳潘却里 的親生母親。',
+            
+            '廖芳土': '【家族層級】陳潘却里 的養父。',
+            '廖謝蘭英': '【家族層級】陳潘却里 的養母。',
+
+            // 【第二代】
+            '陳清炎': '【出生壽辰】明治十九年（1886年）十月三日出生。\n【家庭關係】\n▪妻為 林麵；\n▪為 陳木 之親生父親。',
+            '林麵': '【出生壽辰】明治十八年（1885年）五月二十五日出生。\n【家庭關係】\n▪夫為 陳清炎；\n▪為 陳木 之親生母親。',
+
+            // 【第三代核心】
+            '陳木': '【出生壽辰】民國七年（1918年）十一月十九日出生。\n【家庭關係】\n▪ 配偶：陳潘却里\n▪ 前妻：鴛鴦\n\n【子女長幼順序】共育有：\n▪ 長男：陳東隆\n▪ 長女：陳鳳鶯\n▪ 二女：陳雪梅\n▪ 三女：陳美麟\n▪ 二男：陳東輝\n▪ 四女：陳富美\n▪ 五女：陳美莉\n▪ 六女：陳雅莉',
+            '陳潘却里': '【出生壽辰】民國十七年（1928年）一月二十日出生。\n【家庭關係】夫為 陳木。\n【血緣脈絡】潘金竜 與 潘陳阿珠 之親生二女；廖芳土 與 廖謝蘭英 之養女。',
+
+            // 【第四、五代分支】
+            '陳東隆': '廢物、不肖子、吸血蟲\n▪【配偶關係】\n▪ 第一任妻子：李錦枝\n▪ 第二任妻子：楊碧玲\n【子女後代】育有一女：陳薏婷。',
+            '陳薏婷': '【家庭關係】父親為 陳東隆。',
+
+            '陳鳳鶯': '【配偶關係】丈夫為 蔡宗霖。\n【子女後代】育有一子：蔡佳良。',
+            '蔡佳良': '【家庭關係】母親為 陳鳳鶯，父親為 蔡宗霖。',
+
+            '陳雪梅': '【配偶關係】丈夫為 余標鎮。\n【子女後代】共育有：\n▪ 長女：余青桂\n▪ 長子：余青松\n▪ 二女：余青美\n▪ 三女：余青秀',
+            '余青桂': '【家庭關係】母親為 陳雪梅，父親為 余標鎮（長女）。',
+            '余青松': '【家庭關係】母親為 陳雪梅，父親為 余標鎮（長子）。',
+            '余青美': '【家庭關係】母親為 陳雪梅，父親為 余標鎮（二女）。',
+            '余青秀': '【家庭關係】母親為 陳雪梅，父親為 余標鎮（三女）。',
+
+            '陳美麟': '【配偶關係】\n▪ 第一任丈夫：陳文昌\n▪ 第二任丈夫：陳俊廷\n【子女後代】共育有：\n▪ 長男：陳孝謙\n▪ 二男：陳宇濤\n▪ 三男：陳宇峰\n▪ 養女：陳宥芯',
+            '陳孝謙': '原名：陳宇達\n▪【家庭關係】母親為 陳美麟（長男）。',
+            '陳宇濤': '【家庭關係】母親為 陳美麟（二男）。',
+            '陳宇峰': '【家庭關係】母親為 陳美麟（三男）。',
+            '陳宥芯': '原名：陳書怡\n▪【家庭關係】母親為 陳美麟（養女）。',
+
+            '陳東輝': '【配偶關係】妻子為 潘幼珠。\n【子女後代】共育有：\n▪ 長女：陳麗如\n▪ 二女：陳安妮',
+            '陳麗如': '【家庭關係】父親為 陳東輝（長女）。',
+            '陳安妮': '【家庭關係】父親為 陳東輝（二女）。',
+
+            '陳富美': '【配偶關係】丈夫為 李明發。\n【子女後代】共育有：\n▪ 長女：李捷忻\n▪ 二女：李宜蓁\n▪ 三女：李梓琳',
+            '李捷忻': '原名：李秀蘭\n▪【家庭關係】母親為 陳富美，父親為 李明發（長女）。',
+            '李宜蓁': '原名：李秀花\n▪【家庭關係】母親為 陳富美，父親為 李明發（二女）。',
+            '李梓琳': '原名：李秀香\n▪【家庭關係】母親為 陳富美，父親為 李明發（三女）。',
+
+            '陳美莉': '【配偶關係】丈夫為 林劉雙根。\n【子女後代】共育有：\n▪ 長男：林俊逸\n▪ 二男：林俊廷',
+            '林俊逸': '【家庭關係】母親為 陳美莉，父親為 林劉雙根（長男）。',
+            '林俊廷': '【家庭關係】母親為 陳美莉，父親為 林劉雙根（二男）。',
+
+            '陳雅莉': '【配偶關係】丈夫為 尤招平。\n【子女後代】共育有：\n▪ 長女：尤思穎\n▪ 長男：尤思緯\n▪ 二女：尤思瑜',
+            '尤思穎': '【家庭關係】母親為 陳雅莉，父親為 尤招平（長女）。',
+            '尤思緯': '【家庭關係】母親為 陳雅莉，父親為 尤招平（長男）。',
+            '尤思瑜': '【家庭關係】母親為 陳雅莉，父親為 尤招平（二女）。',
+
+            // 右側隔離欄位同步對齊（陳潘却里多處點擊均可呈現完整文史）
+            '陳潘却里(右)': '【出生壽辰】民國十七年（1928年）一月二十日出生。\n【家庭關係】夫為 陳木。\n【血緣脈絡】潘金竜 與 潘陳阿珠 之親生二女；廖芳土 與 廖謝蘭英 之養女。'
+        };
+
+
+        // --- 家族樹 SVG 繪圖連線邏輯 ---
+        const svg = document.getElementById('lineSvg');
+        const wrapper = document.getElementById('treeWrapper');
+
+        function getAnchor(id, side = 'bottom') {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const rRect = wrapper.getBoundingClientRect();
+            const eRect = el.getBoundingClientRect();
+            
+            const x = eRect.left - rRect.left + eRect.width / 2;
+            if (side === 'top') return { x, y: eRect.top - rRect.top };
+            return { x, y: eRect.top - rRect.top + eRect.height };
+        }
+
+        function drawLine(x1, y1, x2, y2) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+            line.setAttribute('stroke', 'var(--line-color)');
+            line.setAttribute('stroke-width', '2');
+            svg.appendChild(line);
+        }
+
+        function drawParentBridge(fatherId, motherId, childId) {
+            const pF = getAnchor(fatherId, 'bottom');
+            const pM = getAnchor(motherId, 'bottom');
+            const pC = getAnchor(childId, 'top');
+            if (!pF || !pM || !pC) return;
+
+            const midY = pF.y + 35; 
+            drawLine(pF.x, pF.y, pF.x, midY);
+            drawLine(pM.x, pM.y, pM.x, midY);
+            drawLine(pF.x, midY, pM.x, midY);
+
+            const centerParentX = (pF.x + pM.x) / 2;
+            drawLine(centerParentX, midY, centerParentX, pC.y);
+        }
+
+        function drawOneToMany(parentId, childPrefix, count) {
+            const pP = getAnchor(parentId, 'bottom');
+            if (!pP) return;
+
+            const children = [];
+            for(let i = 1; i <= count; i++) {
+                const pC = getAnchor(`${childPrefix}-${i}`, 'top');
+                if(pC) children.push(pC);
+            }
+            if (children.length === 0) return;
+
+            const midY = pP.y + 40;
+            drawLine(pP.x, pP.y, pP.x, midY);
+
+            const xCoords = children.map(c => c.x);
+            const minX = Math.min(...xCoords);
+            const maxX = Math.max(...xCoords);
+
+            drawLine(minX, midY, maxX, midY);
+            children.forEach(c => {
+                drawLine(c.x, midY, c.x, c.y);
+            });
+        }
+
+        function renderTreeLines() {
+            svg.innerHTML = ''; 
+
+            // === 1. 陳家主脈連線 ===
+            drawParentBridge('n-陳天生', 'n-藍法', 'n-陳清炎');
+            drawParentBridge('n-林糖', 'n-李忤', 'n-林麵');
+
+            // 陳清炎 + 林麵 -> 陳木
+            const pFlame = getAnchor('n-陳清炎', 'bottom');
+            const pNoodle = getAnchor('n-林麵', 'bottom');
+            const pWood = getAnchor('n-陳木', 'top');
+            if(pFlame && pNoodle && pWood) {
+                const midY1 = pFlame.y + 35; 
+                const midY2 = pFlame.y + 70; 
+                
+                drawLine(pFlame.x, pFlame.y, pFlame.x, midY1);
+                drawLine(pNoodle.x, pNoodle.y, pNoodle.x, midY1);
+                drawLine(pFlame.x, midY1, pNoodle.x, midY1);
+
+                const centerParentX = (pFlame.x + pNoodle.x) / 2;
+                
+                drawLine(centerParentX, midY1, centerParentX, midY2);
+                drawLine(centerParentX, midY2, pWood.x, midY2);
+                drawLine(pWood.x, midY2, pWood.x, pWood.y);
+            }
+
+            // 陳木 + 陳潘却里（夫妻結合線） -> 第四代大分支
+            const pWoodBottom = getAnchor('n-陳木', 'bottom');
+            const pWifeBottom = getAnchor('n-陳潘却里', 'bottom');
+            
+            if(pWoodBottom && pWifeBottom) {
+                const midYCouple = pWoodBottom.y + 35; 
+                const midYBranch = pWoodBottom.y + 70; 
+                
+                drawLine(pWoodBottom.x, pWoodBottom.y, pWoodBottom.x, midYCouple);
+                drawLine(pWifeBottom.x, pWifeBottom.y, pWifeBottom.x, midYCouple);
+                drawLine(pWoodBottom.x, midYCouple, pWifeBottom.x, midYCouple);
+                
+                const coupleCenterX = (pWoodBottom.x + pWifeBottom.x) / 2;
+                drawLine(coupleCenterX, midYCouple, coupleCenterX, midYBranch);
+                
+                const targetIds = ['n-陳東隆', 'n-陳鳳鶯', 'n-陳雪梅', 'n-陳美麟', 'n-陳東輝', 'n-陳富美', 'n-陳美莉', 'n-陳雅莉'];
+                const cPoints = targetIds.map(id => getAnchor(id, 'top')).filter(p => p !== null);
+                
+                const xLines = cPoints.map(p => p.x);
+                drawLine(Math.min(...xLines), midYBranch, Math.max(...xLines), midYBranch);
+                cPoints.forEach(p => drawLine(p.x, midYBranch, p.x, p.y));
+            }
+
+            // 第四代 -> 第五代
+            drawOneToMany('n-陳東隆', 'c-陳東隆', 1);
+            drawOneToMany('n-陳鳳鶯', 'c-陳鳳鶯', 1);
+            drawOneToMany('n-陳雪梅', 'c-陳雪梅', 4);
+            drawOneToMany('n-陳美麟', 'c-陳美麟', 4);
+            drawOneToMany('n-陳東輝', 'c-陳東輝', 2);
+            drawOneToMany('n-陳富美', 'c-陳富美', 3);
+            drawOneToMany('n-陳美莉', 'c-陳美莉', 2);
+            drawOneToMany('n-陳雅莉', 'c-陳雅莉', 3);
+
+            // === 2. 潘家獨立連線 ===
+            drawOneToMany('n-潘金竜', 'c-潘', 8);
+            const pPan1 = getAnchor('n-潘金竜', 'bottom');
+            const pPan2 = getAnchor('n-潘陳阿珠', 'bottom');
+            if(pPan1 && pPan2) {
+                const midY = pPan1.y + 40;
+                drawLine(pPan2.x, pPan2.y, pPan2.x, midY);
+                drawLine(pPan1.x, midY, pPan2.x, midY);
+            }
+
+            // === 3. 廖家獨立連線 ===
+            drawOneToMany('n-廖芳土', 'c-廖', 2);
+            const pLiao1 = getAnchor('n-廖芳土', 'bottom');
+            const pLiao2 = getAnchor('n-廖謝蘭英', 'bottom');
+            if(pLiao1 && pLiao2) {
+                const midY = pLiao1.y + 40;
+                drawLine(pLiao2.x, pLiao2.y, pLiao2.x, midY);
+                drawLine(pLiao1.x, midY, pLiao2.x, midY);
+            }
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(renderTreeLines);
+        });
+        resizeObserver.observe(wrapper);
+
+        window.addEventListener('load', renderTreeLines);
+        window.addEventListener('resize', renderTreeLines);
+
+        // --- 纯顯示 Modal 彈窗控制邏輯 ---
+        const modal = document.getElementById('noteModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBodyText = document.getElementById('modalBodyText');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        document.querySelectorAll('.member-node').forEach(node => {
+            node.addEventListener('click', () => {
+                const targetName = node.getAttribute('data-name');
+                modalTitle.textContent = targetName.replace(/\(右\)/g, '');
+                
+                const note = familyNotes[targetName];
+                if (note && note.trim() !== '') {
+                    modalBodyText.textContent = note;
+                    modalBodyText.style.color = "#444";
+                    modalBodyText.style.fontStyle = "normal";
+                } else {
+                    modalBodyText.textContent = "暫無相關備註資料。";
+                    modalBodyText.style.color = "#999";
+                    modalBodyText.style.fontStyle = "italic";
+                }
+                
+                modal.showModal();
+            });
+        });
+
+        closeModalBtn.addEventListener('click', () => modal.close());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+    </script>
+</body>
+</html>
